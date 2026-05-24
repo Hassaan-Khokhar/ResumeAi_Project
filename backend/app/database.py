@@ -72,9 +72,19 @@ def convert_srv_to_standard(uri: str) -> str:
 
 async def connect_db():
     global client, db
-    # Apply direct shard connection to bypass DNS SRV timeouts
-    direct_uri = convert_srv_to_standard(settings.MONGODB_URI)
-    client = AsyncIOMotorClient(direct_uri)
+    # Try the original SRV URI first (works on proper cloud servers like Render).
+    # Only fall back to the direct-shard workaround if SRV DNS fails
+    # (e.g., on university/corporate networks that block SRV lookups).
+    try:
+        client = AsyncIOMotorClient(settings.MONGODB_URI, serverSelectionTimeoutMS=5000)
+        await client.admin.command("ping")
+        print("[OK] Connected via SRV URI")
+    except Exception as e:
+        print(f"[WARN] SRV connection failed ({e}), trying direct shard fallback...")
+        direct_uri = convert_srv_to_standard(settings.MONGODB_URI)
+        client = AsyncIOMotorClient(direct_uri, serverSelectionTimeoutMS=10000)
+        await client.admin.command("ping")
+        print("[OK] Connected via direct shard fallback")
     db = client[settings.DATABASE_NAME]
 
     # ── Indexes (Advanced DB Optimization) ──
