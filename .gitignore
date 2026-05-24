@@ -4,3 +4,7 @@ __pycache__/
 venv/
 dist/
 .DS_Store
+backend/models/dataset/
+backend/venv/
+backend/*.pdf
+backend/.env

@@ -8,6 +8,7 @@ from app.database import resumes_col, job_postings_col, match_reports_col, activ
 from app.pdf_parser import extract_text_from_pdf, extract_skills_from_text, estimate_experience_years
 from app.gemini_engine import analyze_with_gemini
 from app.ml_engine import compute_fallback_score
+from app.resume_classifier import predict_match_score
 from bson import ObjectId
 
 router = APIRouter(prefix="/api/analyze", tags=["AI Analysis"])
@@ -57,6 +58,14 @@ async def analyze_resume(
         traceback.print_exc()
         result = compute_fallback_score(resume_text, job_description)
 
+    # Step 3.5: Trained ML Model — Resume-Job Match Scoring
+    try:
+        trained_prediction = predict_match_score(resume_text, job_description)
+        if trained_prediction:
+            result["trained_model_prediction"] = trained_prediction
+    except Exception as e:
+        print(f"[WARN] Trained match scorer skipped: {e}")
+
     # Step 4: Save match report
     report_doc = {
         "user_id": user_id,
@@ -74,6 +83,7 @@ async def analyze_resume(
         "keyword_matches": result.get("keyword_matches", []),
         "ats_tips": result.get("ats_tips", []),
         "model_used": result.get("_meta", {}).get("model", "unknown"),
+        "category_prediction": result.get("category_prediction", {}),
         "created_at": datetime.utcnow(),
     }
     report_result = await match_reports_col().insert_one(report_doc)

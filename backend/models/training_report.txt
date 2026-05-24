@@ -1,0 +1,13 @@
+ResumeAI Match Scoring Model Report — 2026-05-19 22:45:07.496920
+Pairs: 4968, Features: 7
+MAE: 7.31, RMSE: 8.44, R²: 0.6424
+CV Mean R²: 0.6270
+
+Feature Importance:
+  skill_match_%: 0.7170
+  cosine_similarity: 0.1354
+  keyword_density: 0.0832
+  resume_skills: 0.0458
+  missing_skills: 0.0092
+  job_skills: 0.0071
+  matched_skills: 0.0023

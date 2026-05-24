@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { jobsAPI } from '../api';
 import { Briefcase, MapPin, DollarSign, Clock, Search, Plus, Loader2, Upload, FileText, Zap, Target, CheckCircle, XCircle, AlertTriangle, X, TrendingUp, Send, Eye, Download, Users, BarChart3, Calendar, ClipboardList, Trash2, GripVertical } from 'lucide-react';
@@ -235,11 +236,11 @@ function CreateJobModal({ editData, onClose, onCreated, addToast }) {
   );
 }
 
-// ─── Compatibility Check Modal ──────────────
 function CompatibilityModal({ job, onClose, addToast }) {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const navigate = useNavigate();
   const inputRef = useRef(null);
 
   const handleCheck = async () => {
@@ -257,10 +258,11 @@ function CompatibilityModal({ job, onClose, addToast }) {
 
   const r = result;
   const scoreColor = r ? (r.match_score >= 75 ? 'var(--success)' : r.match_score >= 50 ? 'var(--warning)' : 'var(--danger)') : '';
+  const tp = r?.trained_model_prediction;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="glass-card modal-card" style={{ maxWidth: 580, maxHeight: '85vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+      <div className="glass-card modal-card" style={{ maxWidth: 620, maxHeight: '90vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <div>
             <h3><Zap size={18} color="var(--accent)" style={{ verticalAlign: 'middle', marginRight: 4 }} /> AI Compatibility Check</h3>
@@ -347,8 +349,15 @@ function CompatibilityModal({ job, onClose, addToast }) {
               </div>
             )}
 
-            <button className="btn-secondary" onClick={() => { setResult(null); setFile(null); }}
-              style={{ width: '100%', justifyContent: 'center' }}>Check Again</button>
+            {/* Buttons: Check Again + View Full Report */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-secondary" onClick={() => { setResult(null); setFile(null); }}
+                style={{ flex: 1, justifyContent: 'center' }}>Check Again</button>
+              <button className="btn-primary" onClick={() => { onClose(); navigate('/ai', { state: { results: r } }); }}
+                style={{ flex: 1, justifyContent: 'center', background: 'linear-gradient(135deg, #6c5ce7, #a855f7)' }}>
+                <Eye size={16} /> View Full Report
+              </button>
+            </div>
           </div>
         )}
       </div>

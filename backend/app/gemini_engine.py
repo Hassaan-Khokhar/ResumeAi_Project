@@ -94,12 +94,68 @@ async def analyze_with_gemini(resume_text: str, job_description: str) -> dict:
     import asyncio
 
     def _call_gemini():
+        import typing
+        from typing import List, Dict, Any, Optional
+
         model = genai.GenerativeModel(settings.GEMINI_MODEL)
+        
+        # Force Gemini to return exactly this JSON structure
         return model.generate_content(
             prompt,
             generation_config=genai.GenerationConfig(
                 temperature=0.2,
                 response_mime_type="application/json",
+                response_schema={
+                    "type": "object",
+                    "properties": {
+                        "match_score": {"type": "integer"},
+                        "skills_score": {"type": "number"},
+                        "experience_score": {"type": "number"},
+                        "keyword_score": {"type": "number"},
+                        "matched_skills": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        },
+                        "missing_skills": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "skill": {"type": "string"},
+                                    "importance": {"type": "string"},
+                                    "suggestion": {"type": "string"}
+                                }
+                            }
+                        },
+                        "experience_analysis": {
+                            "type": "object",
+                            "properties": {
+                                "required_years": {"type": "number", "nullable": True},
+                                "candidate_years": {"type": "number", "nullable": True},
+                                "match_percentage": {"type": "number"},
+                                "notes": {"type": "string"}
+                            }
+                        },
+                        "strengths": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        },
+                        "improvements": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        },
+                        "rewritten_summary": {"type": "string"},
+                        "keyword_matches": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        },
+                        "ats_tips": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        }
+                    },
+                    "required": ["match_score", "skills_score", "experience_score", "keyword_score", "matched_skills", "missing_skills", "experience_analysis", "strengths", "improvements", "rewritten_summary", "keyword_matches", "ats_tips"]
+                }
             )
         )
 
@@ -111,21 +167,30 @@ async def analyze_with_gemini(resume_text: str, job_description: str) -> dict:
     latency_ms = (time.time() - start_time) * 1000
     print(f"[GEMINI] Responded in {latency_ms:.0f}ms")
 
-    # Extract the text response
+    # Extract JSON block carefully
     response_text = response.text.strip()
+    
+    # Try to find the JSON block using { and }
+    start_idx = response_text.find('{')
+    end_idx = response_text.rfind('}')
+    
+    if start_idx != -1 and end_idx != -1:
+        response_text = response_text[start_idx:end_idx+1]
 
-    # Clean potential markdown code fences
-    if response_text.startswith("```"):
-        # Remove ```json and trailing ```
-        response_text = response_text.split("\n", 1)[-1]
-        if response_text.endswith("```"):
-            response_text = response_text[:-3]
-        response_text = response_text.strip()
+    # Clean common JSON errors from Gemini (trailing commas, unescaped newlines)
+    import re
+    # Fix trailing commas
+    response_text = re.sub(r',\s*}', '}', response_text)
+    response_text = re.sub(r',\s*\]', ']', response_text)
+    # Fix unescaped newlines inside strings (simple heuristic: replace \n with \\n if not already escaped)
+    # This is tricky with regex, so we'll rely on the trailing comma fix mostly.
 
     # Parse JSON (with robust fallback for truncated strings)
     try:
-        result = json.loads(response_text)
+        result = json.loads(response_text, strict=False)
     except json.JSONDecodeError as e:
+        print(f"[GEMINI WARNING] JSON Parse Error: {e}")
+        print(f"--- FAILED JSON START ---\n{response_text}\n--- FAILED JSON END ---")
         print(f"[GEMINI WARNING] Truncated JSON detected. Attempting regex recovery...")
         # Recover what we can from the truncated string
         import re
