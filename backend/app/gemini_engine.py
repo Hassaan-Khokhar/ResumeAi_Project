@@ -104,6 +104,7 @@ async def analyze_with_gemini(resume_text: str, job_description: str) -> dict:
             prompt,
             generation_config=genai.GenerationConfig(
                 temperature=0.2,
+                max_output_tokens=4096,
                 response_mime_type="application/json",
                 response_schema={
                     "type": "object",
